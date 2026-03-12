@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PE情绪卡牌选牌系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑", sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        /* 牌堆区域样式 */
+        .card-deck-area {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .deck-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .deck-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .card-type-switch {
+            display: flex;
+            gap: 8px;
+        }
+
+        .switch-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            min-width: 80px;
+        }
+
+        .switch-btn.active {
+            background-color: #d32f2f;
+            color: #fff;
+            border-color: #d32f2f;
+        }
+
+        .switch-btn.action-active {
+            background-color: #1976d2;
+            border-color: #1976d2;
+        }
+
+        /* 花色筛选区域样式 - 核心优化：兼顾排版和可读性 */
+        .suit-filter-area {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 6px;
+        }
+
+        .filter-title {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        /* 筛选按钮容器：移动端适配优先 */
+        .suit-filter-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        /* 分类按钮（正向/负向/内在/外在）：移动端自适应宽度 */
+        .filter-btn.category-btn {
+            flex: 1;
+            min-width: calc(25% - 8px); /* 保证4个按钮一行 */
+            max-width: none;
+            padding: 10px 6px;
+            font-size: 13px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 全部按钮：单独占一行，宽度100% */
+        .filter-btn.all-btn {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 5px;
+        }
+
+        .filter-btn.active {
+            background-color: #2196f3;
+            color: #fff;
+            border-color: #2196f3;
+        }
+
+        .select-mode-switch {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            min-width: 100px;
+        }
+
+        .mode-btn.active {
+            background-color: #2196f3;
+            color: #fff;
+            border-color: #2196f3;
+        }
+
+        .card-deck {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 8px;
+            justify-content: center;
+        }
+
+        /* 扑克牌样式核心（移动端适配） */
+        .card {
+            width: calc(33.33% - 10px);
+            min-width: 80px;
+            max-width: 120px;
+            height: auto;
+            aspect-ratio: 2/3;
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* 情感卡牌（红色调）基础样式 */
+        .emotion-card {
+            background: linear-gradient(135deg, #fff8f8, #ffebee);
+            border: 2px solid #d32f2f;
+        }
+
+        /* 行动卡牌（蓝色调）基础样式 */
+        .action-card {
+            background: linear-gradient(135deg, #f0f7ff, #e3f2fd);
+            border: 2px solid #1976d2;
+        }
+
+        /* 卡牌选中态 */
+        .card.selected {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border: 2px solid #4caf50;
+        }
+        /* 区分首选/再选/行动卡牌的选中态边框 */
+        .card.selected-first {
+            border-color: #ff9800; /* 橙色标记首选 */
+        }
+        .card.selected-second {
+            border-color: #9c27b0; /* 紫色标记再选 */
+        }
+        .card.selected-action {
+            border-color: #00bcd4; /* 青色标记行动卡牌 */
+        }
+
+        /* 卡牌花色/类型标识 */
+        .card-suit {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .emotion-card .card-suit {
+            color: #d32f2f;
+        }
+
+        .action-card .card-suit {
+            color: #1976d2;
+        }
+
+        .card-type {
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+        }
+
+        .card-word {
+            font-size: 14px;
+            text-align: center;
+            font-weight: bold;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px 0;
+        }
+
+        .card-number {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .emotion-card .card-number {
+            color: #d32f2f;
+        }
+
+        .action-card .card-number {
+            color: #1976d2;
+        }
+
+        /* 已选卡牌区域通用样式 */
+        .selected-cards-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .selected-cards-area {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .selected-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .selected-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        /* 不同类型标题颜色 */
+        .first-title {
+            color: #ff9800;
+        }
+        .second-title {
+            color: #9c27b0;
+        }
+        .action-title {
+            color: #00bcd4;
+        }
+
+        .save-btn {
+            padding: 10px 16px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            min-width: 100px;
+        }
+
+        .save-btn:hover {
+            background-color: #388e3c;
+        }
+
+        .selected-cards {
+            min-height: 150px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            background-color: #fafafa;
+            justify-content: center;
+        }
+        /* 不同类型区域边框颜色 */
+        .first-selected-cards {
+            border-color: #ff9800;
+        }
+        .second-selected-cards {
+            border-color: #9c27b0;
+        }
+        .action-selected-cards {
+            border-color: #00bcd4;
+        }
+
+        .sort-tip {
+            text-align: center;
+            color: #999;
+            margin-top: 60px;
+            font-size: 13px;
+        }
+
+        /* 滚动条样式优化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        /* 隐藏元素 */
+        .hidden {
+            display: none;
+        }
+
+        /* 图片生成临时容器 */
+        #temp-capture-container {
+            position: fixed;
+            top: 0;
+            left: -9999px;
+            z-index: 9999;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* 大屏适配（平板/电脑） */
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+                gap: 30px;
+            }
+            body {
+                padding: 20px;
+            }
+            .card-deck {
+                max-height: 600px;
+                gap: 15px;
+                justify-content: flex-start;
+            }
+            .card {
+                width: 120px;
+                height: 180px;
+                aspect-ratio: unset;
+            }
+            .selected-cards {
+                min-height: 200px;
+                justify-content: flex-start;
+            }
+            .deck-title, .selected-title {
+                font-size: 20px;
+            }
+            .card-word {
+                font-size: 16px;
+            }
+            .card-suit {
+                font-size: 24px;
+            }
+            .card-number {
+                font-size: 18px;
+            }
+            .sort-tip {
+                margin-top: 80px;
+                font-size: 14px;
+            }
+            /* 大屏筛选按钮优化 */
+            .filter-btn.category-btn {
+                font-size: 14px;
+                padding: 10px;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+</head>
+<body>
+    <div id="temp-capture-container"></div>
+    
+    <div class="container">
+        <!-- 牌堆区域 -->
+        <div class="card-deck-area">
+            <div class="deck-header">
+                <div class="deck-title">PE卡牌堆</div>
+                <div class="card-type-switch">
+                    <button class="switch-btn active" id="emotion-switch">情感卡牌</button>
+                    <button class="switch-btn" id="action-switch">行动卡牌</button>
+                </div>
+            </div>
+
+            <!-- 花色/类型筛选区域 -->
+            <div class="suit-filter-area" id="suit-filter-area">
+                <div class="filter-title">花色/类型筛选：</div>
+                <div class="suit-filter-btns" id="suit-filter-btns">
+                    <!-- 筛选按钮会通过JS动态生成 -->
+                </div>
+            </div>
+
+            <!-- 选牌模式切换按钮 -->
+            <div class="select-mode-switch" id="select-mode-switch">
+                <button class="mode-btn active" id="first-select-mode">首选卡牌模式</button>
+                <button class="mode-btn" id="second-select-mode">再选卡牌模式</button>
+            </div>
+            <div class="card-deck" id="card-deck"></div>
+        </div>
+
+        <!-- 已选卡牌区域 -->
+        <div class="selected-cards-container" id="selected-cards-container">
+            <!-- 首选情感卡牌区域 -->
+            <div class="selected-cards-area" id="first-selected-area">
+                <div class="selected-header">
+                    <div class="selected-title first-title">首选情感卡牌（可拖拽排序）</div>
+                    <button class="save-btn" id="save-first-result">保存首选结果</button>
+                </div>
+                <div class="selected-cards first-selected-cards" id="first-selected-cards">
+                    <div class="sort-tip">请切换到「首选卡牌模式」选择卡牌</div>
+                </div>
+            </div>
+
+            <!-- 再选情感卡牌区域 -->
+            <div class="selected-cards-area" id="second-selected-area">
+                <div class="selected-header">
+                    <div class="selected-title second-title">再选情感卡牌（可拖拽排序）</div>
+                    <button class="save-btn" id="save-second-result">保存再选结果</button>
+                </div>
+                <div class="selected-cards second-selected-cards" id="second-selected-cards">
+                    <div class="sort-tip">请切换到「再选卡牌模式」选择卡牌</div>
+                </div>
+            </div>
+
+            <!-- 过程行动卡牌区域（默认隐藏） -->
+            <div class="selected-cards-area hidden" id="action-selected-area">
+                <div class="selected-header">
+                    <div class="selected-title action-title">过程行动卡牌（可拖拽排序）</div>
+                    <button class="save-btn" id="save-action-result">保存行动结果</button>
+                </div>
+                <div class="selected-cards action-selected-cards" id="action-selected-cards">
+                    <div class="sort-tip">请选择行动卡牌</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================== 1. 卡牌数据定义 =====================
+        const cardData = {
+            emotion: {
+                "正向情绪": ["幸福", "思念", "向往", "感动", "勇气", "坦然", "满足", "庆幸", "轻松", "心平气和", "自豪", "兴奋", "爱"],
+                "负向情绪": ["愤怒", "迷茫", "失落", "自卑", "羞耻", "愧疚", "妒忌", "烦躁", "焦虑", "绝望", "悲伤", "憎恨", "恐惧"],
+                "内在需求": ["安全感", "平衡", "尽善尽美", "自我接纳", "自主权", "信心", "自我成长", "理解", "尊重", "责任感", "意义感", "归属感", "成就感"],
+                "外在需求": ["被看见", "付出", "公平", "期待", "和谐", "边界感", "真诚", "包容", "陪伴", "被信任", "被支持", "被需要", "被认可"]
+            },
+            action: {
+                "生活乐趣": ["倾诉", "喝酒", "梳妆打扮", "做清洁", "养宠物", "养花草", "玩游戏", "追剧", "阅读", "购物", "旅游", "听音乐", "睡觉"],
+                "技能培养": ["写作", "跳街舞", "摄影", "烘焙", "烹饪", "茶艺", "插花", "涂鸦", "做手工", "绘画", "演奏乐器", "唱歌", "演讲"],
+                "运动锻炼": ["散步", "打太极", "拳击", "棋类运动", "爬山", "跳绳", "跳舞", "游泳", "挥拍运动", "三大球运动", "健身", "骑车", "跑步"],
+                "自我提升": ["总结反思", "心理咨询", "调侃", "做善事", "独处", "感悟", "学会拒绝", "主动社交", "主动求助", "投入学习", "投入工作", "自我鼓励", "自我觉察"]
+            }
+        };
+
+        const cardNumbers = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+        // 情感卡牌花色映射（最终版）：正向情绪→红心、负向情绪→黑桃、内在需求→方块、外在需求→梅花
+        const emotionSuitMap = {
+            "正向情绪": "♥",
+            "负向情绪": "♠",
+            "内在需求": "♦",
+            "外在需求": "♣"
+        };
+        // 行动卡牌花色映射（最终版）：生活乐趣→红心、技能培养→黑桃、运动锻炼→梅花、自我提升→方块
+        const actionSuitMap = {
+            "生活乐趣": "♥",
+            "技能培养": "♠",
+            "运动锻炼": "♣",
+            "自我提升": "♦"
+        };
+
+        // ===================== 2. 全局状态管理 =====================
+        let firstSelectedCards = []; // 首选情感卡牌列表
+        let secondSelectedCards = []; // 再选情感卡牌列表
+        let actionSelectedCards = []; // 行动卡牌列表
+        let currentShowType = "emotion"; // 当前显示的卡牌类型
+        let currentSelectMode = "first"; // 当前选牌模式：first-首选，second-再选，action-行动
+        let currentFilterSuit = "all"; // 当前筛选的花色/类型：all-全部，其他为具体类型名称
+
+        // ===================== 3. 页面初始化 =====================
+        document.addEventListener("DOMContentLoaded", function() {
+            renderCardDeck("emotion");
+            renderSuitFilterBtns("emotion"); 
+            bindSwitchEvents();
+            bindModeSwitchEvents(); 
+            bindFilterEvents(); 
+            bindSaveEvents(); 
+            initSortable("first-selected-cards"); 
+            initSortable("second-selected-cards");
+            initSortable("action-selected-cards");
+        });
+
+        // ===================== 4. 核心功能函数 =====================
+
+        /**
+         * 获取对应类型+子类型的花色符号
+         */
+        function getSuitSymbol(cardType, subType) {
+            if (cardType === "emotion") {
+                return emotionSuitMap[subType] || "♥";
+            } else {
+                return actionSuitMap[subType] || "♥";
+            }
+        }
+
+        /**
+         * 渲染卡牌堆（支持筛选）
+         */
+        function renderCardDeck(type) {
+            const deckContainer = document.getElementById("card-deck");
+            deckContainer.innerHTML = "";
+
+            const cardTypeData = cardData[type];
+            const typeKeys = Object.keys(cardTypeData);
+
+            typeKeys.forEach((subType) => {
+                // 筛选逻辑：如果不是全部且当前类型不等于筛选类型，则跳过
+                if (currentFilterSuit !== "all" && subType !== currentFilterSuit) {
+                    return;
+                }
+
+                const words = cardTypeData[subType];
+                words.forEach((word, numIndex) => {
+                    const card = document.createElement("div");
+                    card.className = type === "emotion" ? "card emotion-card" : "card action-card";
+                    
+                    // 标记选中状态
+                    if (type === "emotion") {
+                        if (firstSelectedCards.some(item => item.word === word)) {
+                            card.classList.add("selected", "selected-first");
+                        } else if (secondSelectedCards.some(item => item.word === word)) {
+                            card.classList.add("selected", "selected-second");
+                        }
+                    } else {
+                        if (actionSelectedCards.some(item => item.word === word)) {
+                            card.classList.add("selected", "selected-action");
+                        }
+                    }
+
+                    card.dataset.type = type;
+                    card.dataset.subType = subType;
+                    card.dataset.word = word;
+                    card.dataset.number = cardNumbers[numIndex];
+
+                    // 获取正确的花色符号
+                    const suitSymbol = getSuitSymbol(type, subType);
+
+                    card.innerHTML = `
+                        <div class="card-suit">${suitSymbol}</div>
+                        <div class="card-type">${subType}</div>
+                        <div class="card-word">${word}</div>
+                        <div class="card-number">${cardNumbers[numIndex]}</div>
+                    `;
+
+                    card.addEventListener("click", function() {
+                        toggleCardSelection(this);
+                    });
+
+                    deckContainer.appendChild(card);
+                });
+            });
+        }
+
+        /**
+         * 渲染花色/类型筛选按钮 - 核心优化
+         * 1. 分类按钮添加category-btn类，保证移动端显示完整
+         * 2. 全部按钮添加all-btn类，单独占一行
+         */
+        function renderSuitFilterBtns(type) {
+            const filterBtnContainer = document.getElementById("suit-filter-btns");
+            filterBtnContainer.innerHTML = "";
+
+            // 第一步：渲染分类按钮（正向/负向/内在/外在 / 生活/技能/运动/自我）
+            const typeKeys = Object.keys(cardData[type]);
+            typeKeys.forEach((subType) => {
+                const btn = document.createElement("button");
+                btn.className = `filter-btn category-btn ${currentFilterSuit === subType ? "active" : ""}`;
+                btn.dataset.suit = subType;
+                // 获取正确的花色符号
+                const suitSymbol = getSuitSymbol(type, subType);
+                btn.textContent = `${suitSymbol} ${subType}`;
+                filterBtnContainer.appendChild(btn);
+            });
+
+            // 第二步：渲染「全部花色/类型」按钮（单独一行）
+            const allBtn = document.createElement("button");
+            allBtn.className = `filter-btn all-btn ${currentFilterSuit === "all" ? "active" : ""}`;
+            allBtn.dataset.suit = "all";
+            allBtn.textContent = "全部花色/类型";
+            filterBtnContainer.appendChild(allBtn);
+        }
+
+        /**
+         * 切换卡牌选中/放回状态
+         */
+        function toggleCardSelection(cardEl) {
+            const cardInfo = {
+                type: cardEl.dataset.type,
+                subType: cardEl.dataset.subType,
+                word: cardEl.dataset.word,
+                number: cardEl.dataset.number,
+                suit: getSuitSymbol(cardEl.dataset.type, cardEl.dataset.subType)
+            };
+
+            // 情感卡牌逻辑
+            if (cardInfo.type === "emotion") {
+                if (currentSelectMode === "first") {
+                    const isSelected = cardEl.classList.contains("selected-first");
+                    if (isSelected) {
+                        cardEl.classList.remove("selected", "selected-first");
+                        firstSelectedCards = firstSelectedCards.filter(item => item.word !== cardInfo.word);
+                    } else {
+                        if (cardEl.classList.contains("selected-second")) {
+                            cardEl.classList.remove("selected", "selected-second");
+                            secondSelectedCards = secondSelectedCards.filter(item => item.word !== cardInfo.word);
+                        }
+                        cardEl.classList.add("selected", "selected-first");
+                        firstSelectedCards.push(cardInfo);
+                    }
+                    updateSelectedCardsArea("first");
+                } else {
+                    const isSelected = cardEl.classList.contains("selected-second");
+                    if (isSelected) {
+                        cardEl.classList.remove("selected", "selected-second");
+                        secondSelectedCards = secondSelectedCards.filter(item => item.word !== cardInfo.word);
+                    } else {
+                        if (cardEl.classList.contains("selected-first")) {
+                            cardEl.classList.remove("selected", "selected-first");
+                            firstSelectedCards = firstSelectedCards.filter(item => item.word !== cardInfo.word);
+                        }
+                        cardEl.classList.add("selected", "selected-second");
+                        secondSelectedCards.push(cardInfo);
+                    }
+                    updateSelectedCardsArea("second");
+                }
+            } 
+            // 行动卡牌逻辑
+            else {
+                const isSelected = cardEl.classList.contains("selected-action");
+                if (isSelected) {
+                    cardEl.classList.remove("selected", "selected-action");
+                    actionSelectedCards = actionSelectedCards.filter(item => item.word !== cardInfo.word);
+                } else {
+                    cardEl.classList.add("selected", "selected-action");
+                    actionSelectedCards.push(cardInfo);
+                }
+                updateSelectedCardsArea("action");
+            }
+        }
+
+        /**
+         * 更新已选卡牌展示区域
+         * @param {string} type - first/second/action
+         */
+        function updateSelectedCardsArea(type) {
+            let containerId, cardList, tipText;
+            
+            // 根据类型配置参数
+            if (type === "first") {
+                containerId = "first-selected-cards";
+                cardList = firstSelectedCards;
+                tipText = "请切换到「首选卡牌模式」选择卡牌";
+            } else if (type === "second") {
+                containerId = "second-selected-cards";
+                cardList = secondSelectedCards;
+                tipText = "请切换到「再选卡牌模式」选择卡牌";
+            } else {
+                containerId = "action-selected-cards";
+                cardList = actionSelectedCards;
+                tipText = "请选择行动卡牌";
+            }
+
+            const selectedContainer = document.getElementById(containerId);
+
+            if (cardList.length === 0) {
+                selectedContainer.innerHTML = `<div class="sort-tip">${tipText}</div>`;
+                return;
+            }
+
+            selectedContainer.innerHTML = "";
+            cardList.forEach((cardInfo) => {
+                const card = document.createElement("div");
+                card.className = cardInfo.type === "emotion" ? "card emotion-card" : "card action-card";
+                
+                // 添加对应选中样式
+                if (type === "first") card.classList.add("selected-first");
+                else if (type === "second") card.classList.add("selected-second");
+                else card.classList.add("selected-action");
+
+                card.innerHTML = `
+                    <div class="card-suit">${cardInfo.suit}</div>
+                    <div class="card-type">${cardInfo.subType}</div>
+                    <div class="card-word">${cardInfo.word}</div>
+                    <div class="card-number">${cardInfo.number}</div>
+                `;
+                
+                // 点击已选卡牌放回牌堆
+                card.addEventListener("click", function() {
+                    const deckCard = Array.from(document.querySelectorAll(".card")).find(
+                        el => el.dataset.word === cardInfo.word && el.dataset.type === cardInfo.type
+                    );
+                    if (deckCard) deckCard.click();
+                });
+                selectedContainer.appendChild(card);
+            });
+
+            initSortable(containerId);
+        }
+
+        /**
+         * 切换右侧展示区域（情感/行动）
+         */
+        function toggleSelectedArea(type) {
+            const firstArea = document.getElementById("first-selected-area");
+            const secondArea = document.getElementById("second-selected-area");
+            const actionArea = document.getElementById("action-selected-area");
+            const modeSwitch = document.getElementById("select-mode-switch");
+
+            if (type === "emotion") {
+                // 显示情感卡牌的两栏，隐藏行动卡牌栏
+                firstArea.classList.remove("hidden");
+                secondArea.classList.remove("hidden");
+                actionArea.classList.add("hidden");
+                // 显示选牌模式切换按钮
+                modeSwitch.classList.remove("hidden");
+            } else {
+                // 隐藏情感卡牌的两栏，显示行动卡牌栏
+                firstArea.classList.add("hidden");
+                secondArea.classList.add("hidden");
+                actionArea.classList.remove("hidden");
+                // 隐藏选牌模式切换按钮
+                modeSwitch.classList.add("hidden");
+            }
+        }
+
+        /**
+         * 保存为图片
+         */
+        async function downloadImageFile(element, fileName, format = "png") {
+            try {
+                const tempContainer = document.getElementById("temp-capture-container");
+                tempContainer.innerHTML = "";
+                
+                const clone = element.cloneNode(true);
+                clone.classList.remove("hidden");
+                clone.style.width = element.offsetWidth + "px";
+                clone.style.height = element.offsetHeight + "px";
+                clone.style.boxSizing = "border-box";
+                tempContainer.appendChild(clone);
+
+                void clone.offsetHeight;
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const options = {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: "#ffffff",
+                    logging: true,
+                    letterRendering: true,
+                    removeContainer: false,
+                    windowWidth: clone.offsetWidth,
+                    windowHeight: clone.offsetHeight,
+                    x: 0,
+                    y: 0,
+                    width: clone.offsetWidth,
+                    height: clone.offsetHeight,
+                    useWrapper: false,
+                    timeout: 5000
+                };
+
+                const canvas = await html2canvas(tempContainer, options);
+                
+                if (canvas.width === 0 || canvas.height === 0) {
+                    throw new Error("生成的Canvas尺寸为空，无法创建图片");
+                }
+
+                let imageUrl;
+                const quality = 0.95;
+                
+                if (format.toLowerCase() === "jpg" || format.toLowerCase() === "jpeg") {
+                    imageUrl = canvas.toDataURL("image/jpeg", quality);
+                } else {
+                    imageUrl = canvas.toDataURL("image/png");
+                }
+
+                const a = document.createElement("a");
+                a.href = imageUrl;
+                a.download = `${fileName}_${new Date().getTime()}.${format}`;
+                document.body.appendChild(a);
+                
+                if (document.createEvent) {
+                    const event = document.createEvent("MouseEvents");
+                    event.initEvent("click", true, true);
+                    a.dispatchEvent(event);
+                } else {
+                    a.click();
+                }
+                
+                document.body.removeChild(a);
+                tempContainer.innerHTML = "";
+                if (imageUrl.startsWith("blob:")) {
+                    URL.revokeObjectURL(imageUrl);
+                }
+                
+                alert(`${fileName}已成功保存为${format.toUpperCase()}图片！
+文件名：${a.download}
+尺寸：${canvas.width/2}x${canvas.height/2}
+可在浏览器下载文件夹中查看。`);
+                
+            } catch (err) {
+                console.error("图片生成失败：", err);
+                alert(`保存图片失败！错误信息：
+${err.message}
+
+请尝试：
+1. 刷新页面后重试
+2. 使用Chrome浏览器
+3. 关闭广告拦截插件
+4. 确保选中的卡牌区域有内容`);
+            }
+        }
+
+        /**
+         * 绑定卡牌类型切换事件
+         */
+        function bindSwitchEvents() {
+            const emotionSwitch = document.getElementById("emotion-switch");
+            const actionSwitch = document.getElementById("action-switch");
+
+            emotionSwitch.addEventListener("click", function() {
+                if (currentShowType === "emotion") return;
+                
+                currentShowType = "emotion";
+                currentFilterSuit = "all";
+                currentSelectMode = "first";
+                
+                renderSuitFilterBtns("emotion");
+                renderCardDeck("emotion");
+                toggleSelectedArea("emotion");
+                emotionSwitch.classList.add("active");
+                emotionSwitch.classList.remove("action-active");
+                actionSwitch.classList.remove("active");
+                actionSwitch.classList.remove("action-active");
+                document.getElementById("first-select-mode").classList.add("active");
+                document.getElementById("second-select-mode").classList.remove("active");
+            });
+
+            actionSwitch.addEventListener("click", function() {
+                if (currentShowType === "action") return;
+                
+                currentShowType = "action";
+                currentFilterSuit = "all";
+                currentSelectMode = "action";
+                
+                renderSuitFilterBtns("action");
+                renderCardDeck("action");
+                toggleSelectedArea("action");
+                actionSwitch.classList.add("active", "action-active");
+                emotionSwitch.classList.remove("active");
+            });
+        }
+
+        /**
+         * 绑定花色/类型筛选事件
+         */
+        function bindFilterEvents() {
+            const filterBtnContainer = document.getElementById("suit-filter-btns");
+            
+            filterBtnContainer.addEventListener("click", function(e) {
+                if (!e.target.classList.contains("filter-btn")) return;
+                
+                document.querySelectorAll(".filter-btn").forEach(btn => {
+                    btn.classList.remove("active");
+                });
+                
+                currentFilterSuit = e.target.dataset.suit;
+                e.target.classList.add("active");
+                
+                renderCardDeck(currentShowType);
+            });
+        }
+
+        /**
+         * 绑定选牌模式切换事件（首选/再选）
+         */
+        function bindModeSwitchEvents() {
+            const firstModeBtn = document.getElementById("first-select-mode");
+            const secondModeBtn = document.getElementById("second-select-mode");
+
+            firstModeBtn.addEventListener("click", function() {
+                if (currentSelectMode === "first") return;
+                currentSelectMode = "first";
+                firstModeBtn.classList.add("active");
+                secondModeBtn.classList.remove("active");
+                renderCardDeck(currentShowType);
+            });
+
+            secondModeBtn.addEventListener("click", function() {
+                if (currentSelectMode === "second") return;
+                currentSelectMode = "second";
+                secondModeBtn.classList.add("active");
+                firstModeBtn.classList.remove("active");
+                renderCardDeck(currentShowType);
+            });
+        }
+
+        /**
+         * 初始化拖拽排序（适配移动端触摸）
+         */
+        function initSortable(containerId) {
+            const selectedContainer = document.getElementById(containerId);
+            if (selectedContainer.children.length === 0 || selectedContainer.querySelector(".sort-tip")) return;
+
+            new Sortable(selectedContainer, {
+                animation: 150,
+                handle: ".card",
+                touchStartThreshold: 10,
+                preventOnFilter: false,
+                onEnd: function(evt) {
+                    const oldIndex = evt.oldIndex;
+                    const newIndex = evt.newIndex;
+                    let cardList;
+                    
+                    if (containerId === "first-selected-cards") cardList = firstSelectedCards;
+                    else if (containerId === "second-selected-cards") cardList = secondSelectedCards;
+                    else cardList = actionSelectedCards;
+                    
+                    const movedCard = cardList.splice(oldIndex, 1)[0];
+                    cardList.splice(newIndex, 0, movedCard);
+                }
+            });
+        }
+
+        /**
+         * 绑定保存按钮事件
+         */
+        function bindSaveEvents() {
+            // 保存首选结果
+            document.getElementById("save-first-result").addEventListener("click", function() {
+                if (firstSelectedCards.length === 0) {
+                    alert("暂无首选卡牌，无需保存！");
+                    return;
+                }
+                const captureElement = document.getElementById("first-selected-area");
+                downloadImageFile(captureElement, "PE首选情感卡牌", "png");
+            });
+
+            // 保存再选结果
+            document.getElementById("save-second-result").addEventListener("click", function() {
+                if (secondSelectedCards.length === 0) {
+                    alert("暂无再选卡牌，无需保存！");
+                    return;
+                }
+                const captureElement = document.getElementById("second-selected-area");
+                downloadImageFile(captureElement, "PE再选情感卡牌", "png");
+            });
+
+            // 保存行动结果
+            document.getElementById("save-action-result").addEventListener("click", function() {
+                if (actionSelectedCards.length === 0) {
+                    alert("暂无行动卡牌，无需保存！");
+                    return;
+                }
+                const captureElement = document.getElementById("action-selected-area");
+                downloadImageFile(captureElement, "PE过程行动卡牌", "png");
+            });
+        }
+    </script>
+</body>
+</html>
